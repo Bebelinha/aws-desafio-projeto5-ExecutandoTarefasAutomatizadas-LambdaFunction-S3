@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Desafio DIO 5 - Tarefas Automatizadas com Lambda Function e S3
+
+Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: LambdaS3Execution
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "arn:aws:logs:*:*:*"
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource: !Sub "arn:aws:s3:::${MyBucket}/*"
+
+  MyBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "desafio5-s3-isa-${AWS::AccountId}"
+
+  MyLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "desafio5-lambda-isa-${AWS::AccountId}"
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      Code:
+        ZipFile: |
+          import boto3
+          import datetime
+
+          def lambda_handler(event, context):
+              s3 = boto3.client('s3')
+              bucket_name = "${MyBucket}"
+              file_name = f"arquivo_s3_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+              content = "Meu primeiro arquivo gerado no Lambda, incluso no S3 e automatizado pelo CloudFormation!!!"
+
+              s3.put_object(Bucket=bucket_name, Key=file_name, Body=content)
+              print(f"Arquivo {file_name} criado no bucket {bucket_name}")
+
+              return {
+                  "statusCode": 200,
+                  "body": f"Arquivo {file_name} criado com sucesso no bucket {bucket_name}"
+              }
+
